@@ -6,12 +6,11 @@
 // * - Yang Yang
 // */
 
-
 // Give each pin a descriptive name
 #define S1 A0 
-#define S2 A1 
-#define S3 A2 //this is the 4th sensor from the right (might be the other way around
-#define S4 A3 //this is the 4th sensor from the left
+#define S2 A1 //right sensor
+#define S3 A2 //left sensor
+#define S4 A3 
 #define S5 A4
 #define S6 A5
 
@@ -79,23 +78,38 @@ void drive_backwards(){
 }
 void drive_right(){
   //fill in with how to make it turn right
-  return;
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, HIGH);
 }
 void drive_left() {
   //fill in with how to make it turn left
-  return;
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
 }
 void drive_backwards_right(){
   //fill in with how to make it turn backwards right
-  return;
+      digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
 }
 void drive_backwards_left(){
   //fill in with how to make it turn backwards left
-  return;
+      digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
 }
 void stop_moving(){
   //fill in with how to make it stop moving
-  return;
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
 }
 //making a function to update the array:
 void update_array(char LastMove){
@@ -118,19 +132,24 @@ void error_recover(){
  for(int i =0; i<=4; i++){
   if(ERROR_ARRAY[3]=='F'){
     drive_backwards();
-    delay(250);
+    if (analogRead(S3)<=threshold || analogRead(S2)<=threshold){
+      return();
+    }
   }
   else if(ERROR_ARRAY[3]=='R'){
     drive_backwards_right();
-    delay(250);
+    if (analogRead(S3)<=threshold || analogRead(S2)<=threshold){
+      return();
+    }
   }
   else if(ERROR_ARRAY[3]=='L'){
     drive_backwards_left();
-    delay(250);
+    if (analogRead(S3)<=threshold || analogRead(S2)<=threshold){
+      return();
+    }
   }
   else if(ERROR_ARRAY[3]=='S'){
     stop_moving();
-    delay(250);
   }
   reset_array();
  }
@@ -161,12 +180,12 @@ void setup() {
 
   //adjust light levels///////////////////////////////////////////////////////not done//////////////////////////////////////////
 }
-//now for the line scanning logic////////////////////////////////////////////////not done, all movement is not currently working, and the outer sensors arent currently attatched///////////////////////////////////////////////////////
+//now for the line scanning logic////////////////////////////////////////////////not done (the right sensor is S2, and the left S3///////////////////////////////////////////////////////
 void loop() {
   {
   
 //when it sees a line on the outside either speed up or slow down (only allow this if the robot is on the centre line otherwise adjust first)
-   if (analogRead(S1)<=threshold && analogRead(S3)<=threshold && analogRead(S4)<=threshold) //Go faster/ if faster go slower.
+   if (analogRead(OUTSIDELINE)<=threshold && analogRead(S2)<=threshold && analogRead(S3)<=threshold) //Go faster/ if faster go slower.
     if ( fast=true){
       //make anchor go fast
       driving_speed=fast_speed;
@@ -179,7 +198,7 @@ void loop() {
    }
    
 //when it sees the line under the two middle sensors go forwards or when it encounters a line under the two middle sensors and under the two outer sensors also go forwards
-   if ((analogRead(S3)<=threshold && analogRead(S4)<=threshold) || (analogRead(S3)<=threshold && analogRead(S4)<=threshold && analogRead(S1)<=threshold && !analogRead(S6)<=threshold)) //go forward Anchor!
+   if ((analogRead(S3)<=threshold && analogRead(S2)<=threshold) || (analogRead(S3)<=threshold && analogRead(S2)<=threshold && analogRead(OUTSIDESENSOR)<=threshold && !analogRead(OUTSIDESENSOR)<=threshold)) //go forward Anchor!
   {
     Serial.println("Anchor is going Forward");
     analogWrite(ENA, driving_speed);
@@ -191,40 +210,41 @@ void loop() {
 //when it encounters error adjust left or right
 
 //adjust right
-    else if(!analogRead(S4)<=threshold && analogRead(S3)<=threshold)
+    else if(!analogRead(S2)<=threshold && analogRead(S3)<=threshold)
   {
     Serial.println("Anchor is turning right");
     //Serial.println(S6)
     analogWrite(ENA, driving_speed);
     analogWrite(ENB, driving_speed);
-    digitalWrite(IN1, HIGH);
-    digitalWrite(IN2, LOW);
+    drive_right();
     update_array('R');
   }
   
 //adjust left
-    else if(!analogRead(S3)<=threshold && analogRead(S4)<=threshold)
+    else if(!analogRead(S3)<=threshold && analogRead(S2)<=threshold)
   {
     Serial.println("Anchor is turning left");
     //Serial.println(S6)
     analogWrite(ENA, driving_speed);
     analogWrite(ENB, driving_speed);
-    digitalWrite(IN1, LOW);
-    digitalWrite(IN2, HIGH);
+    drive_left();
     update_array('L');
   }
   
 //then if there is no line stop (and then after a couple seconds start error recovery process)
-  else if(!analogRead(S6)<=threshold && !analogRead(S1)<=threshold && !analogRead(S3)<=threshold && !analogRead(S4)<=threshold) //STOP Anchor!
+  else if(!analogRead(OUTSIDESENSOR)<=threshold && !analogRead(OUTSIDESENSOR)<=threshold && !analogRead(S3)<=threshold && !analogRead(S2)<=threshold) //STOP Anchor!
   {
     Serial.println("Anchor is not moving");
     analogWrite(ENA, stop_speed);
     analogWrite(ENB, stop_speed);
-    digitalWrite(IN1, LOW);
-    digitalWrite(IN2, LOW);
-    digitalWrite(IN3, LOW);
-    digitalWrite(IN4, LOW);
-    //start error recovery
+    stop_moving();
+    //start error recovery //repeats the process 4 times until the memory of moves is depleted
+    for (int i = 0; i <= 4; i++) {
     update_array('S');
-  }
+    error_recover();
+    //if at any point after executing a command it reads a sensor again exit the loop
+    if (analogRead(S3)<=threshold || analogRead(S2)<=threshold){
+      return();
+    }
+    }
 }
